@@ -45,3 +45,7 @@ name = "first.custom.ext"
 dependencies = [
     "omni.kit.ui_test" # UI testing extension
 ]
+
+[python.pipapi]
+requirements = ['openai','numpy', 'scipy']
+use_online_index = true
