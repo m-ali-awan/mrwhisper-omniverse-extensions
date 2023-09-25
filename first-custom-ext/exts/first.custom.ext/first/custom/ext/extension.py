@@ -7,8 +7,12 @@ import openai
 import carb
 import json
 import omni.kit
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import aiohttp
 
 
+api_key = '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'
 root_path = 'C:/Users/ov-user/Documents/mrwhisper-omniverse-extensions'
 asset_dict = {'coffee table, of brownish color, appleseed':
         "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Furniture/FurnitureSets/Appleseed/Appleseed_CoffeeTable.usd",
@@ -16,29 +20,30 @@ asset_dict = {'coffee table, of brownish color, appleseed':
         "omniverse://localhost/Projects/mr-whisper-test1-prjct/Scifi_Girl_v.usdz"}
 
 
-def return_object_of_focus(selected_objects, prompt):
-        
-        messages = []
-        sys_header = '''You will get list of objects from omniverse Stage.
-        Your goal would be to return only 1 out of those items,
-        that is of FOCUS from user. You have to decide this, based
-        on the input question.
-        Like if query is, MOve table 2 meters right. You have to return the 
-        TABLE item path from given list'''
-        system_mes = {"role":"system","content":sys_header}
-        prompt = f'''{prompt}, and possible options are:{selected_objects}'''
-        query_message  = {'role':'user','content':prompt}
-        messages.append(system_mes)
-        messages.append(query_message)    
+async def return_object_of_focus(selected_objects, prompt):
+    messages = []
+    sys_header = '''You will get list of objects from omniverse Stage.
+    Your goal would be to return only 1 out of those items,
+    that is of FOCUS from user. You have to decide this, based
+    on the input question.
+    Like if query is, MOve table 2 meters right. You have to return the 
+    TABLE item path from given list'''
+    system_mes = {"role": "system", "content": sys_header}
+    prompt = f'''{prompt}, and possible options are:{selected_objects}'''
+    query_message = {'role': 'user', 'content': prompt}
+    messages.append(system_mes)
+    messages.append(query_message)
 
-        gpt4_res=openai.ChatCompletion.create(
-                            #model="gpt-3.5-turbo",
-                            #model = model_to_use,
-                            messages=messages,
-                            temperature=0
-                                    )
-        result = gpt4_res(gpt4_res['choices'][0].message.content)
-        return result
+    async with aiohttp.ClientSession() as session:
+        async with session.post('https://api.openai.com/v1/chat/completions', json={
+            'model': 'gpt-3.5-turbo',
+            'messages': messages,
+            'temperature': 0
+        }, headers={'Authorization': api_key}) as resp:
+            gpt4_res = await resp.json()
+    
+    result = gpt4_res['choices'][0].message.content
+    return result
 
 class MyExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
@@ -59,16 +64,28 @@ class MyExtension(omni.ext.IExt):
                 ui.Button("Place Asset", clicked_fn=self._place_asset)
                 ui.Button("Move Asset", clicked_fn=self.execute_move)
 
-    
     def execute_move(self):
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError("Loop is closed")
+        except RuntimeError as ex:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        loop.create_task(self._execute_move())
+
+    async def _execute_move(self):
+        run_loop = asyncio.get_event_loop()
         ctx = omni.usd.get_context()
         stage = ctx.get_stage()
         selection = ctx.get_selection().get_selected_prim_paths()
         prompt = self._prompt_model.as_string
 
-        object_of_focus = return_object_of_focus(selection,prompt)
-        selected_prim = stage.GetPrimAtPath(object_of_focus) 
-    
+        # Use the existing event loop to run the coroutine
+        object_of_focus = await return_object_of_focus(selection, prompt)
+        selected_prim = stage.GetPrimAtPath(object_of_focus)
+        await asyncio.sleep(1)
+
     def _place_asset(self):
         ctx = omni.usd.get_context()
         stage = ctx.get_stage()
