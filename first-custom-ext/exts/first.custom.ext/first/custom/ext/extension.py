@@ -187,65 +187,6 @@ class MyExtension(omni.ext.IExt):
         else:
             carb.log_error("Translate operation not found.")
 
-    def _place_asset(self):
-
-        ctx = omni.usd.get_context()
-        stage = ctx.get_stage()
-        selection = ctx.get_selection().get_selected_prim_paths()
-        
-        if len(selection) == 0:
-            carb.log_warn("No object selected.")
-            return
-
-        selected_path = str(selection[5])
-        selected_prim = stage.GetPrimAtPath(selected_path)
-        asset_dict = {}
-        for prim in stage.TraverseAll():
-            prim_info={}
-            if not prim.IsActive():
-                    
-                continue
-                
-                # Get the prim's type name (e.g., Xform, Mesh, etc.)
-                type_name = prim.GetTypeName()
-                prim_info['type'] = str(type_name)
-                
-                # Get the prim's translation (if available)
-                xform_attr = prim.GetAttribute('xformOp:translate')
-                if xform_attr and xform_attr.IsValid():
-                    translation = xform_attr.Get()
-                    if translation:
-                        prim_info['translation'] = [translation[0], translation[1], translation[2]]
-        
-        asset_dict[str(prim.GetPath())] = prim_info
-        with open(f'{root_path}/first-custom-ext/Nbs/prim_dict.json', 'w+') as f:
-            json.dump(asset_dict, f, indent=4)
-        # Add more attributes here as needed
-        
-        # Add this prim's info to the main dictionary
-        asset_dict[str(prim.GetPath())] = prim_info
-
-
-        if not selected_prim or not selected_prim.IsValid():
-            carb.log_warn(f"No valid prim at path {selected_path}")
-            return
-
-        # Process the prompt (simplified for demonstration)
-        prompt = self._prompt_model.as_string
-        if "table" in prompt:
-            asset_path = "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Furniture/FurnitureSets/Appleseed/Appleseed_CoffeeTable.usd"
-        else:
-            carb.log_warn("No matching asset found for the prompt.")
-            return
-
-        # Place the asset (simplified for demonstration)
-        new_prim_path = Sdf.Path(selected_path + "/NewAsset")
-        new_prim = stage.DefinePrim(new_prim_path)
-        #new_prim.GetReferences().AddReference(asset_path)
-
-        carb.log_info(f"Placed new asset at {new_prim_path}")
-    
-
 
     def test_place_asset(self):#
 
@@ -283,11 +224,11 @@ class MyExtension(omni.ext.IExt):
 
         reference_prim = stage.GetPrimAtPath(reference_object_pth)
         try:
-            if reference_prim and reference_prim.isValid():
+            if reference_prim and reference_prim.IsValid():
                 xform = UsdGeom.Xformable(reference_prim)
                 translate_op = None
                 for op in xform.GetOrderedXformOps():
-                    if op.GetOptype() == UsdGeom.XformOp.typeTranslate:
+                    if op.GetOpType() == UsdGeom.XformOp.TypeTranslate:
                         translate_op = op
                         break
                 if translate_op:
@@ -298,20 +239,28 @@ class MyExtension(omni.ext.IExt):
             else:
                 print("Reference object not found.")
 
-            new_translation_values = [translation[0] + 100,translation[1],translation[2]]
-        except:
-            new_translation_values = [0.0,0.0,0.0]
+            #new_translation_values = [translation[0] + 100,translation[1],translation[2]]
+            if 'right' in new_object_direction.lower():
+                print('IN RIGHT !!!!')
+                new_translation_values = [translation[0] + int(new_object_steps),0.0,0.0]
+            else:
+                new_translation_values = [translation[0] - int(new_object_steps),0.0,0.0]
+
+        except Exception as e:
+            print(f'ERORR is ::::{e}')
+            new_translation_values = [0.0, 0.0, 0.0]
         omni.kit.commands.execute('CreatePayloadCommand',
                 usd_context= omni.usd.get_context(),
                 path_to=Sdf.Path(f'/World/{new_name}'),
                 asset_path=new_object_url,
                 instanceable=False)
+        print('DOING THIS@@@@')
         omni.kit.commands.execute('TransformMultiPrimsSRTCpp',
                 count=1,
                 paths=[f'/World/{new_name}'],
                 #new_translations=[-156.4188672560385, 130.35249515180125, 199.61057602557773],
                 new_translations = new_translation_values,
-                new_rotation_eulers=[0.0, -90.0, -90.0],
+                new_rotation_eulers=[0.0, 90.0, 0.0],
                 new_rotation_orders=[0, 1, 2],
                 new_scales=[1.0, 1.0, 1.0],)
         
