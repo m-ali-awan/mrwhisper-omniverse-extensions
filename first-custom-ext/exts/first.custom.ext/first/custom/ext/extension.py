@@ -13,6 +13,7 @@ import aiohttp
 from .widget import ProgressBar
 from .tagged_assets import *
 import ast
+from .utils import format_string
 #from .openai_related import return_object_of_focus
 
 
@@ -121,7 +122,7 @@ class MyExtension(omni.ext.IExt):
                 ui.Label("Enter your prompt:")
                 ui.StringField(model=self._prompt_model)
                 #ui.Button("Place Asset", clicked_fn=self._place_asset)
-                ui.Button('Test Place Asset', clicked_fn = self._test_place_asset)
+                ui.Button('Test Place Asset', clicked_fn=self.test_place_asset)
                 ui.Button("Move Asset", clicked_fn=self.execute_move)
                 self.progress = ProgressBar()
 
@@ -246,7 +247,7 @@ class MyExtension(omni.ext.IExt):
     
 
 
-    def test_place_asset(self):
+    def test_place_asset(self):#
 
         try:
             loop = asyncio.get_event_loop()
@@ -256,9 +257,9 @@ class MyExtension(omni.ext.IExt):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        loop.create_task(self._test_place_asset(self.progress))
+        loop.create_task(self._test_place_asset(progress_widget=self.progress))
 
-    async def _test_place_asset(self):
+    async def _test_place_asset(self,progress_widget):
         run_loop = asyncio.get_event_loop()
         progress_widget.show_bar(True)
         task = run_loop.create_task(progress_widget.play_anim_forever())
@@ -267,16 +268,55 @@ class MyExtension(omni.ext.IExt):
         stage = ctx.get_stage()
         selection = ctx.get_selection().get_selected_prim_paths()
         prompt = self._prompt_model.as_string
-
+        #
         res = await return_new_object_and_position(asset_dict,
                                                    selection,prompt,api_key)
         res_dict = ast.literal_eval(res)
         print(f'Result Dict is::::{res_dict}')
 
         new_object_url= asset_dict[res_dict['new_object']]
-        reference_object_pth = asset_dict[res_dict['reference_object']]
-        new_object_direction = asset_dict[res_dict['new_object_direction']]   
-        new_object_steps = asset_dict[res_dict['new_object_steps']]                              
+        reference_object_pth = res_dict['reference_object']
+        new_object_direction = res_dict['new_object_direction']   
+        new_object_steps =res_dict['new_object_steps']                              
+
+        new_name = format_string(res_dict['new_object'])
+
+        reference_prim = stage.GetPrimAtPath(reference_object_pth)
+        try:
+            if reference_prim and reference_prim.isValid():
+                xform = UsdGeom.Xformable(reference_prim)
+                translate_op = None
+                for op in xform.GetOrderedXformOps():
+                    if op.GetOptype() == UsdGeom.XformOp.typeTranslate:
+                        translate_op = op
+                        break
+                if translate_op:
+                    translation = translate_op.Get()
+                    print("Translation of the reference object:", translation)
+                else:
+                    print("Translate operation not found for the reference object.")
+            else:
+                print("Reference object not found.")
+
+            new_translation_values = [translation[0] + 100,translation[1],translation[2]]
+        except:
+            new_translation_values = [0.0,0.0,0.0]
+        omni.kit.commands.execute('CreatePayloadCommand',
+                usd_context= omni.usd.get_context(),
+                path_to=Sdf.Path(f'/World/{new_name}'),
+                asset_path=new_object_url,
+                instanceable=False)
+        omni.kit.commands.execute('TransformMultiPrimsSRTCpp',
+                count=1,
+                paths=[f'/World/{new_name}'],
+                #new_translations=[-156.4188672560385, 130.35249515180125, 199.61057602557773],
+                new_translations = new_translation_values,
+                new_rotation_eulers=[0.0, -90.0, -90.0],
+                new_rotation_orders=[0, 1, 2],
+                new_scales=[1.0, 1.0, 1.0],)
+        
+        
+
 
         task.cancel()
         await asyncio.sleep(1)

@@ -8,4 +8,6 @@ asset_dict = {'coffee table, of brownish color, appleseed':
         'table alarm clock, green color':
         'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Decor/Clocks/AlarmClock_Retro.usd',
         'wall clock, silver color, and round dial':
-        'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Decor/Clocks/Clock_Hucksbee.usd'}
+        'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Decor/Clocks/Clock_Hucksbee.usd',
+        'three-tier path light':
+        'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Outdoors/Lighting/3-TierPathLight.usd'}
