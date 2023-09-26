@@ -19,7 +19,7 @@ from .utils import format_string
 
 # Variables
 api_key = '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'
-root_path = 'C:/Users/ov-user/Documents/mrwhisper-omniverse-extensions'
+#root_path = 'C:/Users/ov-user/Documents/mrwhisper-omniverse-extensions'
 
 async def test_parse_prompt(prompt):
     # Use ChatGPT to parse the prompt and extract necessary information
