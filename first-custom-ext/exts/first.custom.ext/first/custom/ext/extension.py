@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 import aiohttp
 from .widget import ProgressBar
 from .tagged_assets import *
+import ast
 #from .openai_related import return_object_of_focus
 
 
@@ -19,12 +20,20 @@ from .tagged_assets import *
 api_key = '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'
 root_path = 'C:/Users/ov-user/Documents/mrwhisper-omniverse-extensions'
 
+async def test_parse_prompt(prompt):
+    # Use ChatGPT to parse the prompt and extract necessary information
+    # For simplicity, this function returns hardcoded values in this example
+    return {
+        "object_to_place": "omniverse://localhost/Projects/mr-whisper-test1-prjct/Scifi_Girl_v.usdz",
+        "reference_object": "/World/Daybed",
+        "relative_position": {"direction": "left", "distance": 2}
+    }
 
 async def return_object_of_focus(selected_objects, prompt,api_key):
     messages = []
     sys_header = '''You will get list of objects from omniverseStage.
     Your goal would be to return only 1 out of those items,
-    that is of FOCUS from user, and the DIRECTION to move in. You have to decide this, based
+    that is of FOCUS from user,the DIRECTION to move in, and units to move. You have to decide this, based
     on the input question.
     Like if query is, Move table 2 meters right. You have to return the 
     TABLE item path from given list,DIRECTION.\n
@@ -33,7 +42,7 @@ async def return_object_of_focus(selected_objects, prompt,api_key):
     example_q = {'role':'user','content':f'''Move table 2 meters left, 
                  and possible options are:['/World/Plane',
                                            '/World/Daybed','/World/CoffeTable']'''}
-    example_re = {'role':'assistant','content':'/World/CoffeTable, Left'}
+    example_re = {'role':'assistant','content':'/World/CoffeTable, Left, 2'}
     prompt = f'''{prompt}, and possible options are:{selected_objects}'''
     query_message = {'role': 'user', 'content': prompt}
     messages.append(system_mes)
@@ -52,6 +61,46 @@ async def return_object_of_focus(selected_objects, prompt,api_key):
     result = gpt4_res["choices"][0]["message"]['content']
     return result
 
+async def return_new_object_and_position(asset_dict,current_objects,prompt,api_key):
+   
+    new_objects = list(asset_dict.keys())
+    messages = []
+    sys_header = ''' You have to return only a dict-type response. With following keys:
+    - new_object
+    - refernece_object,
+    - new_object_direction
+    - new_object_steps
+    You will be provided with the paths of current objects in omniverse stage, and a list of tags 
+    for to choose from new objects. You will return reference-object, what new object should be used, and in which direction
+    and how many steps from refernece-object it should be placed. 
+    DON'T GIVE ANY EXPLANATORY INFO, JUST THE REQUIRED KEYS\n
+    *Again, keep in mind, return only in form of dict, as that has to be loaded as dict, 
+    with mentioned keys.*'''
+    system_mes = {"role": "system", "content": sys_header}
+    example_q = {'role':'user','content':f'''Place a classic chair, 2 meters left of bed. \n 
+                 and possible new-object options are:['coffee table, of brownish color, appleseed',
+                                           'modern blue chair','old vantage chair'].\n
+                 Objects present in current stage are:['/World/Plane',
+                                           '/World/Daybed','/World/CoffeTable']'''}
+    example_re = {'role':'assistant','content':'''{'new_object':'old vantage chair','reference_object':'/World/Daybed','new_object_direction':'left','new_object_steps':2}'''}
+    prompt = f'''{prompt}, \n and possible new-object options are:{new_objects} \n
+                Objects present in current stage are:{current_objects}'''
+    query_message = {'role': 'user', 'content': prompt}
+    messages.append(system_mes)
+    messages.append(example_q)
+    messages.append(example_re)
+    messages.append(query_message)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post('https://api.openai.com/v1/chat/completions', json={
+            'model': 'gpt-3.5-turbo',
+            'messages': messages,
+            'temperature': 0
+        }, headers = {"Authorization": "Bearer %s" % api_key}) as resp:
+            gpt4_res = await resp.json()
+    print(gpt4_res)
+    result = gpt4_res["choices"][0]["message"]['content']
+    return result
 
 
 class MyExtension(omni.ext.IExt):
@@ -71,7 +120,8 @@ class MyExtension(omni.ext.IExt):
             with ui.VStack():
                 ui.Label("Enter your prompt:")
                 ui.StringField(model=self._prompt_model)
-                ui.Button("Place Asset", clicked_fn=self._place_asset)
+                #ui.Button("Place Asset", clicked_fn=self._place_asset)
+                ui.Button('Test Place Asset', clicked_fn = self._test_place_asset)
                 ui.Button("Move Asset", clicked_fn=self.execute_move)
                 self.progress = ProgressBar()
 
@@ -98,7 +148,7 @@ class MyExtension(omni.ext.IExt):
 
         # Use the existing event loop to run the coroutine
         res = await return_object_of_focus(selection, prompt,api_key)
-        object_of_focus,direct_gpt  = res.split(',')
+        object_of_focus,direct_gpt, steps_to_take  = res.split(',')
         selected_prim = stage.GetPrimAtPath(object_of_focus)
         task.cancel()
         await asyncio.sleep(1)
@@ -114,13 +164,13 @@ class MyExtension(omni.ext.IExt):
         if translate_op:
             # Get the current translation
             current_translation = translate_op.Get()
-            print(f'Direction is:::{direct_gpt}')
+            
             # Modify the translation based on the direction and distance
-            parameters = {'direction': direct_gpt, 'distance': 65}
+            parameters = {'direction': direct_gpt, 'distance': int(steps_to_take)}
             direction = parameters['direction']
             distance = parameters['distance']
-            print(direction.lower()=='right')
-            print(type(direction.lower()))
+            print(steps_to_take)
+           
             to_check = direction.lower()
             if 'right' in to_check:
                 print(f'SUCCESSFUL::{direction}')
@@ -137,6 +187,7 @@ class MyExtension(omni.ext.IExt):
             carb.log_error("Translate operation not found.")
 
     def _place_asset(self):
+
         ctx = omni.usd.get_context()
         stage = ctx.get_stage()
         selection = ctx.get_selection().get_selected_prim_paths()
@@ -194,17 +245,40 @@ class MyExtension(omni.ext.IExt):
         carb.log_info(f"Placed new asset at {new_prim_path}")
     
 
-    def move_object(self,prim, parameters):
-        # getting current translations
-        xform  = UsdGeom.Xformable(prim)
-        translation = xform.getXformOpOrderAttr().Get()
 
-        direction = parameters['direction']
-        distance = parameters['distance']
+    def test_place_asset(self):
 
-        if direction == 'right':
-            translation[0] += distance
-        elif direction =='left':
-            translation[0] -= distance
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError('Loop is Closed')
+        except RuntimeError as ex:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
-        xform.AddTranslateOp().Set(value = Gf.Vec3d(*translation))
+        loop.create_task(self._test_place_asset(self.progress))
+
+    async def _test_place_asset(self):
+        run_loop = asyncio.get_event_loop()
+        progress_widget.show_bar(True)
+        task = run_loop.create_task(progress_widget.play_anim_forever())
+
+        ctx = omni.usd.get_context()
+        stage = ctx.get_stage()
+        selection = ctx.get_selection().get_selected_prim_paths()
+        prompt = self._prompt_model.as_string
+
+        res = await return_new_object_and_position(asset_dict,
+                                                   selection,prompt,api_key)
+        res_dict = ast.literal_eval(res)
+        print(f'Result Dict is::::{res_dict}')
+
+        new_object_url= asset_dict[res_dict['new_object']]
+        reference_object_pth = asset_dict[res_dict['reference_object']]
+        new_object_direction = asset_dict[res_dict['new_object_direction']]   
+        new_object_steps = asset_dict[res_dict['new_object_steps']]                              
+
+        task.cancel()
+        await asyncio.sleep(1)
+        progress_widget.show_bar(False)
+
