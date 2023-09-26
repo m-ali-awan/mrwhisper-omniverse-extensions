@@ -11,28 +11,29 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import aiohttp
 from .widget import ProgressBar
+from .tagged_assets import *
+#from .openai_related import return_object_of_focus
 
+
+# Variables
 api_key = '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'
 root_path = 'C:/Users/ov-user/Documents/mrwhisper-omniverse-extensions'
-asset_dict = {'coffee table, of brownish color, appleseed':
-        "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Furniture/FurnitureSets/Appleseed/Appleseed_CoffeeTable.usd",
-        'sci fi girl':
-        "omniverse://localhost/Projects/mr-whisper-test1-prjct/Scifi_Girl_v.usdz"}
+
 
 async def return_object_of_focus(selected_objects, prompt,api_key):
     messages = []
     sys_header = '''You will get list of objects from omniverseStage.
     Your goal would be to return only 1 out of those items,
-    that is of FOCUS from user. You have to decide this, based
+    that is of FOCUS from user, and the DIRECTION to move in. You have to decide this, based
     on the input question.
-    Like if query is, MOve table 2 meters right. You have to return the 
-    TABLE item path from given list.\n
+    Like if query is, Move table 2 meters right. You have to return the 
+    TABLE item path from given list,DIRECTION.\n
     JUST RETURN ONE OUT OF GIVEN OPTIONS, NO EXPLANATION ETC'''
     system_mes = {"role": "system", "content": sys_header}
     example_q = {'role':'user','content':f'''Move table 2 meters left, 
                  and possible options are:['/World/Plane',
                                            '/World/Daybed','/World/CoffeTable']'''}
-    example_re = {'role':'assistant','content':'/World/CoffeTable'}
+    example_re = {'role':'assistant','content':'/World/CoffeTable, Left'}
     prompt = f'''{prompt}, and possible options are:{selected_objects}'''
     query_message = {'role': 'user', 'content': prompt}
     messages.append(system_mes)
@@ -52,10 +53,11 @@ async def return_object_of_focus(selected_objects, prompt,api_key):
     return result
 
 
+
 class MyExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
         self._prompt_model = ui.SimpleStringModel()
-        self._window = ui.Window("Asset Placer", width=400, height=200)
+        self._window = ui.Window("Cognitive Scene Editing", width=400, height=200)
         self._window.frame.set_build_fn(self._build_fn)
        
         #self._window.show()
@@ -72,6 +74,8 @@ class MyExtension(omni.ext.IExt):
                 ui.Button("Place Asset", clicked_fn=self._place_asset)
                 ui.Button("Move Asset", clicked_fn=self.execute_move)
                 self.progress = ProgressBar()
+
+
     def execute_move(self):
         try:
             loop = asyncio.get_event_loop()
@@ -93,7 +97,8 @@ class MyExtension(omni.ext.IExt):
         prompt = self._prompt_model.as_string
 
         # Use the existing event loop to run the coroutine
-        object_of_focus = await return_object_of_focus(selection, prompt,api_key)
+        res = await return_object_of_focus(selection, prompt,api_key)
+        object_of_focus,direct_gpt  = res.split(',')
         selected_prim = stage.GetPrimAtPath(object_of_focus)
         task.cancel()
         await asyncio.sleep(1)
@@ -109,15 +114,21 @@ class MyExtension(omni.ext.IExt):
         if translate_op:
             # Get the current translation
             current_translation = translate_op.Get()
-
+            print(f'Direction is:::{direct_gpt}')
             # Modify the translation based on the direction and distance
-            parameters = {'direction': 'right', 'distance': 15}
+            parameters = {'direction': direct_gpt, 'distance': 65}
             direction = parameters['direction']
             distance = parameters['distance']
-
-            if direction == 'right':
+            print(direction.lower()=='right')
+            print(type(direction.lower()))
+            to_check = direction.lower()
+            if 'right' in to_check:
+                print(f'SUCCESSFUL::{direction}')
                 current_translation[0] += distance
-            elif direction == 'left':
+            elif 'left' in to_check:
+                print(f'SUCCESSFUL::{direction}')
+                current_translation[0] -= distance
+            else:
                 current_translation[0] -= distance
 
             # Set the new translation
