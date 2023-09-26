@@ -255,12 +255,16 @@ class MyExtension(omni.ext.IExt):
                 asset_path=new_object_url,
                 instanceable=False)
         print('DOING THIS@@@@')
+        if 'sci_fi_girl' in new_name:
+            rotations = [0.0,90.0,0.0]
+        else:
+            rotations = [0.0,-90.0,-90.0]
         omni.kit.commands.execute('TransformMultiPrimsSRTCpp',
                 count=1,
                 paths=[f'/World/{new_name}'],
                 #new_translations=[-156.4188672560385, 130.35249515180125, 199.61057602557773],
                 new_translations = new_translation_values,
-                new_rotation_eulers=[0.0, 90.0, 0.0],
+                new_rotation_eulers=rotations,
                 new_rotation_orders=[0, 1, 2],
                 new_scales=[1.0, 1.0, 1.0],)
         
