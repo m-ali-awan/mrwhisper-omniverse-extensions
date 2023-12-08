@@ -3,7 +3,7 @@ import omni.ui as ui
 from pxr import Usd, UsdGeom, Gf
 from pxr import Usd, Sdf
 import omni.usd
-import openai
+#import openai
 import carb
 import json
 import omni.kit

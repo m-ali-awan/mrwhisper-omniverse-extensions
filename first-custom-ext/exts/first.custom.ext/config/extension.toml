@@ -47,5 +47,5 @@ dependencies = [
 ]
 
 [python.pipapi]
-requirements = ['openai','numpy', 'scipy']
+requirements = ['numpy', 'scipy']
 use_online_index = true
