@@ -14,12 +14,13 @@ from .widget import ProgressBar
 from .tagged_assets import *
 import ast
 from .utils import format_string
-#from .openai_related import return_object_of_focus
-
+from .openai_related import return_object_of_focus
+from pathlib import Path
 
 # Variables
 api_key = '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'
 #root_path = 'C:/Users/ov-user/Documents/mrwhisper-omniverse-extensions'
+ASSETS_JSON_PATH = Path(__file__).parent / "assets.json"
 
 async def test_parse_prompt(prompt):
     # Use ChatGPT to parse the prompt and extract necessary information
@@ -107,6 +108,8 @@ async def return_new_object_and_position(asset_dict,current_objects,prompt,api_k
 class MyExtension(omni.ext.IExt):
     def on_startup(self, ext_id):
         self._prompt_model = ui.SimpleStringModel()
+        self._asset_desc_model = ui.SimpleStringModel()
+        self._asset_url_model = ui.SimpleStringModel()
         self._window = ui.Window("Cognitive Scene Editing", width=400, height=200)
         self._window.frame.set_build_fn(self._build_fn)
        
@@ -125,8 +128,48 @@ class MyExtension(omni.ext.IExt):
                 ui.Button('Test Place Asset', clicked_fn=self.test_place_asset)
                 ui.Button("Move Asset", clicked_fn=self.execute_move)
                 self.progress = ProgressBar()
+                ui.Label("Asset Tag/Description:")
+                ui.StringField(model=self._asset_desc_model)
 
+                ui.Label("Asset URL:")
+                ui.StringField(model = self._asset_url_model)
 
+                ui.Button("Add Asset", clicked_fn=self.add_asset_to_dict)
+
+                
+
+    def add_asset_to_dict(self):
+        tag = self._asset_desc_model.as_string
+        url = self._asset_url_model.as_string
+        if tag and url:
+            # Load the current assets
+            assets = self.load_assets()
+
+            # Add the new asset
+            assets[tag] = url
+
+            # Save the updated assets
+            self.save_assets(assets)
+
+            # Optional: Clear the fields after adding
+            #self._tag_model.set_value('')
+            #self._url_model.set_value('')
+
+    def load_assets(self):
+        # Define the path to your JSON file
+        json_path = Path(ASSETS_JSON_PATH)
+        if json_path.exists():
+            with open(json_path, 'r') as file:
+                return json.load(file)
+        else:
+            print('---------------Assets Json not exists')
+            return {}  # Return an empty dictionary if the file doesn't exist
+
+    def save_assets(self, assets):
+        # Define the path to your JSON file
+        json_path = Path(ASSETS_JSON_PATH)
+        with open(json_path, 'w') as file:
+            json.dump(assets, file, indent=4)
     def execute_move(self):
         try:
             loop = asyncio.get_event_loop()
@@ -210,6 +253,8 @@ class MyExtension(omni.ext.IExt):
         selection = ctx.get_selection().get_selected_prim_paths()
         prompt = self._prompt_model.as_string
         #
+        asset_dict = self.load_assets()
+        print(f'@@@@@@{asset_dict}@@@@@@@')
         res = await return_new_object_and_position(asset_dict,
                                                    selection,prompt,api_key)
         res_dict = ast.literal_eval(res)

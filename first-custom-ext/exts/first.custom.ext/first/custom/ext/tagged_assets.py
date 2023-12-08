@@ -1,10 +1,10 @@
 
 
-
+"""
 asset_dict = {'coffee table, of brownish color, appleseed':
         "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Furniture/FurnitureSets/Appleseed/Appleseed_CoffeeTable.usd",
         'sci fi girl':
-        "omniverse://localhost/Projects/mr-whisper-test1-prjct/Scifi_Girl_v.usdz",
+        "omniverse://localhost/Projects/Scifi_Girl_v.usdz",
         'table alarm clock, green color':
         'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Decor/Clocks/AlarmClock_Retro.usd',
         'wall clock, silver color, and round dial':
@@ -13,3 +13,6 @@ asset_dict = {'coffee table, of brownish color, appleseed':
         'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Outdoors/Lighting/3-TierPathLight.usd',
         'FoosballTable, playing tool':
         'http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential/Entertainment/GameRoom/FoosballTable.usd'}
+
+
+"""
